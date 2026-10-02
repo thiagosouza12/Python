@@ -1,0 +1,232 @@
+# Exercícios e Estudos em Python
+
+Exercícios práticos de lógica de programação, estruturas de dados e orientação a objetos em Python.
+
+## 📂 Estrutura de Pastas
+
+- `01-logica-basica/`: Variáveis, condicionais (`if/else`) e laços de repetição (`for/while`).
+- `02-estruturas-de-dados/`: Manipulação de listas, tuplas e dicionários.
+- `03-funcoes-e-modulos/`: Criação de funções e organização de código.
+
+## 🐍 Versão do Python
+- Python 3.x
+
+## Projeto em sala de aula, Truco
+
+import os
+import random
+
+VALORES = ["4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"]
+NAIPES = ["♦", "♠", "♥", "♣"]
+PROXIMA_APOSTA = {1: 3, 3: 6, 6: 9, 9: 12}
+NOME_APOSTA = {3: "TRUCO", 6: "SEIS", 9: "NOVE", 12: "DOZE"}
+
+
+def limpar():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def criar_baralho():
+    baralho = [(v, n) for v in VALORES for n in NAIPES]
+    random.shuffle(baralho)
+    return baralho
+
+
+def descobrir_manilha(vira):
+    return VALORES[(VALORES.index(vira[0]) + 1) % len(VALORES)]
+
+
+def forca(carta, manilha):
+    if carta[0] == manilha:
+        return 100 + NAIPES.index(carta[1])
+    return VALORES.index(carta[0])
+
+
+def texto(carta):
+    return carta[0] + carta[1]
+
+
+def ler_inteiro(mensagem, minimo, maximo):
+    while True:
+        entrada = input(mensagem).strip()
+        if entrada.isdigit() and minimo <= int(entrada) <= maximo:
+            return int(entrada)
+        print("Opção inválida.")
+
+
+def mostrar(estado, jogador, mesa, rodada):
+    nomes = estado["nomes"]
+    placar = estado["placar"]
+    print(f"{nomes[0]} {placar[0]} x {placar[1]} {nomes[1]}")
+    print(
+        f"Vira: {texto(estado['vira'])} | Manilha: {estado['manilha']} | "
+        f"Valendo: {estado['valor']}"
+    )
+    print(f"Rodada {rodada + 1} de 3")
+    for i, resultado in enumerate(estado["resultados"], 1):
+        print(f"  Rodada {i}: {resultado}")
+    for j, carta in mesa.items():
+        print(f"{nomes[j]} jogou {texto(carta)}")
+    print(f"\nSuas cartas, {nomes[jogador]}:")
+    for i, carta in enumerate(estado["maos"][jogador], 1):
+        print(f"{i} - {texto(carta)}")
+
+
+def responder_aposta(estado, jogador, nova):
+    nomes = estado["nomes"]
+    print(f"{nomes[jogador]}, seu adversário pediu {NOME_APOSTA[nova]}!")
+    print(f"Vira: {texto(estado['vira'])} | Manilha: {estado['manilha']}")
+    print("Suas cartas: " + "  ".join(texto(c) for c in estado["maos"][jogador]))
+    opcoes = ["Aceitar", "Correr"]
+    if nova < 12:
+        opcoes.append(f"Aumentar para {NOME_APOSTA[PROXIMA_APOSTA[nova]]}")
+    print()
+    for i, opcao in enumerate(opcoes, 1):
+        print(f"{i} - {opcao}")
+    return ler_inteiro("Escolha: ", 1, len(opcoes))
+
+
+def pedir_truco(estado, jogador):
+    nomes = estado["nomes"]
+    solicitante = jogador
+    while True:
+        nova = PROXIMA_APOSTA[estado["valor"]]
+        respondente = 1 - solicitante
+        limpar()
+        print(f"{nomes[solicitante]} pediu {NOME_APOSTA[nova]}!")
+        input(f"Passe o teclado para {nomes[respondente]} e pressione ENTER...")
+        limpar()
+        resposta = responder_aposta(estado, respondente, nova)
+        if resposta == 2:
+            estado["fuga"] = solicitante
+            limpar()
+            print(f"{nomes[respondente]} correu!")
+            input("Pressione ENTER para continuar...")
+            return False
+        estado["valor"] = nova
+        if resposta == 1:
+            estado["quem_pode"] = {respondente} if nova < 12 else set()
+            limpar()
+            print(f"{nomes[respondente]} aceitou! A mão agora vale {nova}.")
+            input(f"Devolva o teclado para {nomes[jogador]} e pressione ENTER...")
+            return True
+        solicitante = respondente
+
+
+def turno(estado, jogador, mesa, rodada):
+    nomes = estado["nomes"]
+    limpar()
+    input(f"Vez de {nomes[jogador]}. Pressione ENTER para ver suas cartas...")
+    while True:
+        limpar()
+        mostrar(estado, jogador, mesa, rodada)
+        mao = estado["maos"][jogador]
+        pode = jogador in estado["quem_pode"] and estado["valor"] < 12
+        mensagem = "\nEscolha o número da carta"
+        if pode:
+            mensagem += f" ou T para pedir {NOME_APOSTA[PROXIMA_APOSTA[estado['valor']]]}"
+        entrada = input(mensagem + ": ").strip().lower()
+        if pode and entrada == "t":
+            if not pedir_truco(estado, jogador):
+                return None
+            continue
+        if entrada.isdigit() and 1 <= int(entrada) <= len(mao):
+            return mao[int(entrada) - 1]
+        print("Opção inválida.")
+        input("Pressione ENTER para continuar...")
+
+
+def decidir(resultados, mao_inicial):
+    if len(resultados) == 1:
+        return None
+    r1 = resultados[0]
+    r2 = resultados[1]
+    if len(resultados) == 2:
+        if r1 is not None and r2 is not None:
+            return r1 if r1 == r2 else None
+        if r1 is None and r2 is not None:
+            return r2
+        if r1 is not None and r2 is None:
+            return r1
+        return None
+    r3 = resultados[2]
+    if r3 is not None:
+        return r3
+    if r1 is not None:
+        return r1
+    return mao_inicial
+
+
+def jogar_mao(nomes, placar, mao_inicial):
+    baralho = criar_baralho()
+    estado = {
+        "nomes": nomes,
+        "placar": placar,
+        "maos": [[baralho.pop() for _ in range(3)] for _ in range(2)],
+        "vira": baralho.pop(),
+        "valor": 1,
+        "quem_pode": {0, 1},
+        "fuga": None,
+        "resultados": [],
+    }
+    estado["manilha"] = descobrir_manilha(estado["vira"])
+    vencedores = []
+    primeiro = mao_inicial
+    rodada = 0
+    while True:
+        mesa = {}
+        for jogador in (primeiro, 1 - primeiro):
+            carta = turno(estado, jogador, mesa, rodada)
+            if carta is None:
+                return estado["fuga"], estado["valor"]
+            estado["maos"][jogador].remove(carta)
+            mesa[jogador] = carta
+        f0 = forca(mesa[0], estado["manilha"])
+        f1 = forca(mesa[1], estado["manilha"])
+        if f0 > f1:
+            vencedor = 0
+        elif f1 > f0:
+            vencedor = 1
+        else:
+            vencedor = None
+        vencedores.append(vencedor)
+        estado["resultados"].append(nomes[vencedor] if vencedor is not None else "Empate")
+        limpar()
+        print(f"Rodada {rodada + 1}:")
+        for j in (0, 1):
+            print(f"{nomes[j]}: {texto(mesa[j])}")
+        if vencedor is None:
+            print("\nEmpate!")
+        else:
+            print(f"\n{nomes[vencedor]} venceu a rodada.")
+            primeiro = vencedor
+        input("Pressione ENTER para continuar...")
+        decisao = decidir(vencedores, mao_inicial)
+        if decisao is not None:
+            return decisao, estado["valor"]
+        rodada += 1
+
+
+def main():
+    limpar()
+    print("=== TRUCO PAULISTA - 2 JOGADORES ===\n")
+    nome1 = input("Nome do jogador 1: ").strip() or "Jogador 1"
+    nome2 = input("Nome do jogador 2: ").strip() or "Jogador 2"
+    nomes = [nome1, nome2]
+    placar = [0, 0]
+    mao_inicial = random.randint(0, 1)
+    while max(placar) < 12:
+        vencedor, pontos = jogar_mao(nomes, placar, mao_inicial)
+        placar[vencedor] = min(12, placar[vencedor] + pontos)
+        limpar()
+        print(f"{nomes[vencedor]} venceu a mão e ganhou {pontos} ponto(s)!\n")
+        print(f"{nomes[0]} {placar[0]} x {placar[1]} {nomes[1]}")
+        input("\nPressione ENTER para continuar...")
+        mao_inicial = 1 - mao_inicial
+    limpar()
+    campeao = 0 if placar[0] >= 12 else 1
+    print(f"🏆 {nomes[campeao]} venceu o jogo por {placar[0]} x {placar[1]}!")
+
+
+if __name__ == "__main__":
+    main()
